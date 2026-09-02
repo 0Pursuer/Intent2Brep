@@ -1,68 +1,56 @@
 # Roadmap
 
-## v0.1 — deterministic proof of concept
-- strict `PartIntent` schema
-- constrained Chinese parser
-- optional OpenAI-compatible parser
-- base/web analytic solids
-- circular cuts + base slot
-- B-Rep validation
-- STEP/BREP export
-- exact HLR SVG output
+## v0.1-v0.3 — parametric baseline + DrawingIR (completed)
 
-## v0.2 — reliability boundary
-- fail closed on unsupported requests
-- no silent centering of underspecified holes
-- explicit `x/y/z` placement in constrained grammar
-- pre-kernel geometry-domain checks
-- explicit centered/perpendicular constraints in the IR
-- schema CLI
-- end-to-end CLI smoke test
-- regression suite
-- conda environment + GitHub Actions CI
+- strict PartIntent schema and constrained parser
+- deterministic CadQuery/OpenCASCADE construction
+- BRepCheck + STEP/BREP export
+- exact HLR views and DrawingIR
+- three-view projection-ray 3D vertex candidates
 
-## v0.3 — Structured DrawingIR + first cross-view primitive (implemented)
-- exact OCCT HLR projected edges exposed as JSON entities
-- projector world frame persisted per view
-- visible/hidden semantics
-- sharp/smooth/outline categories
-- analytic curve type preservation (`LINE`, `CIRCLE`, `BSPLINE`, ...)
-- exact circle center/radius when available
-- sampled fallback for generic curves
-- exact visible/hidden overlap de-duplication
-- three-view projection-ray intersection
-- third-view reprojection verification
-- 3D vertex candidate JSON output
-- 13-test regression suite
+## v0.4 — visual-first architectural pivot (implemented)
 
-## v0.4 — projected-edge correspondence -> 3D wireframe
-- candidate 3D edge generation from reconstructed vertices
-- compatibility scoring against all projected entities
-- line/arc/circle correspondence rules
-- hidden-line-aware matching
-- branch-and-bound / graph search for globally consistent edge sets
-- ambiguity score instead of forced single answers
-- external DrawingIR loader independent of generated B-Rep
-- benchmark adapter for the Zhang et al. 2023 SVG/STEP dataset
+- retain v0.3 as `parametric` baseline
+- provider/service interfaces for T2I and image-to-3D
+- OpenAI-compatible T2I adapter
+- Hunyuan3D-2.1 official FastAPI adapter
+- Hunyuan3D-2mv 1-4 named-view adapter + optional sidecar
+- `text2image`, `image2mesh`, `text2mesh`, `views2mesh`, `mesh-info` CLI
+- reconstruction-friendly mechanical visual prompt
+- persistent stage manifest/intermediate outputs
+- trimesh hard gate: topology, watertightness, extents, area, volume
+- fake-provider regression tests; no GPU model required by CI
 
-## v0.5 — surface hypothesis engine
-- loop detection
-- plane first
-- cylinder/cone/sphere/torus
-- extrusion/revolution surfaces
-- NURBS only as fallback
-- complexity penalty + projection residual
+## v0.5 — mechanical reconstruction benchmark
 
-## v0.6 — raw B-Rep assembler
-- loops -> wires -> faces
-- surface intersection/trimming
-- sewing
-- same-domain unification
-- topology validation
-- HLR back-projection scoring
+- 30-100 STEP reference parts rendered from controlled cameras
+- compare single-view Hunyuan3D-2.1 vs 1-4-view Hunyuan3D-2mv vs cloud model
+- Chamfer/Hausdorff/silhouette metrics
+- hole, thin-wall, sharp-edge and component-count preservation scores
+- deterministic camera/render manifest
+- establish a pass/fail threshold before investing in CADification
 
-## v0.7 — human-in-the-loop UI
-- text + IR + orthographic views side by side
-- edit dimensions/constraints directly
-- highlight unresolved/ambiguous entities
-- regenerate only affected geometry
+## v0.6 — CADification primitives
+
+- mesh cleanup without destroying openings
+- face-normal + curvature region growing
+- robust plane/cylinder/cone/sphere/torus fitting
+- analytic-complexity prior (simple primitives before freeform)
+- adjacency graph and sharp-edge extraction
+- engineering symmetry / coaxial / coplanar regularization
+
+## v0.7 — raw B-Rep reconstruction
+
+- primitive surface intersections
+- trim-curve and loop construction
+- wire -> face -> shell -> solid
+- sewing and same-domain unification
+- BRepCheck hard gate
+- STEP export
+
+## v0.8 — verification + feature layer
+
+- HLR reprojection against source/multi-view masks
+- geometry residual optimization
+- canonical feature recognition/reconstruction as an optional final layer
+- SolidWorks/NX/Creo adapters only after analytic B-Rep quality is stable
