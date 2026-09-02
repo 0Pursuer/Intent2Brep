@@ -6,13 +6,18 @@ from pathlib import Path
 import typer
 
 from .mesh.metrics import inspect_mesh
-from .models import PartIntent
-from .pipelines.parametric import run_parametric_pipeline
-from .pipelines.visual import run_image_to_mesh, run_text_to_image, run_text_to_mesh, run_views_to_mesh
+from .pipelines.visual import (
+    run_image_to_mesh,
+    run_text_to_image,
+    run_text_to_mesh,
+    run_views_to_mesh,
+)
 from .providers.i23d import Hunyuan3D21HttpProvider, Hunyuan3D2MVHttpProvider
 from .providers.t2i import OpenAICompatibleImageProvider
 
-app = typer.Typer(help="Intent2Brep: visual-first Text/Image-to-3D research pipeline with a parametric baseline")
+app = typer.Typer(
+    help="Intent2Brep: visual-first Text/Image-to-3D research pipeline toward analytic B-Rep"
+)
 
 
 @app.callback()
@@ -47,28 +52,6 @@ def _openai_t2i(
         response_format=response_format,
         endpoint_path=endpoint_path,
     )
-
-
-@app.command()
-def parametric(
-    text: str = typer.Argument(...),
-    output: Path = typer.Option(Path("out"), "--output", "-o"),
-    parser: str = typer.Option("regex"),
-    allow_unsupported: bool = typer.Option(False, "--allow-unsupported"),
-):
-    r = run_parametric_pipeline(text, output, parser=parser, allow_unsupported=allow_unsupported)
-    typer.echo(json.dumps({"validation": r.validation, "outputs": r.outputs}, indent=2, ensure_ascii=False))
-
-
-@app.command()
-def build(
-    text: str = typer.Argument(...),
-    output: Path = typer.Option(Path("out"), "--output", "-o"),
-    parser: str = typer.Option("regex"),
-    allow_unsupported: bool = typer.Option(False, "--allow-unsupported"),
-):
-    """Backward-compatible alias for `parametric`."""
-    return parametric(text, output, parser, allow_unsupported)
 
 
 @app.command("text2image")
@@ -217,11 +200,6 @@ def text2mesh_cmd(
 @app.command("mesh-info")
 def mesh_info(mesh: Path = typer.Argument(..., exists=True, readable=True)):
     typer.echo(json.dumps(inspect_mesh(mesh), indent=2, ensure_ascii=False))
-
-
-@app.command()
-def schema():
-    typer.echo(json.dumps(PartIntent.model_json_schema(), indent=2, ensure_ascii=False))
 
 
 if __name__ == "__main__":
