@@ -1,45 +1,46 @@
 # Roadmap
 
-## v0.1-v0.3 — parametric baseline + DrawingIR (completed)
+## v0.4 — visual pipeline foundation (completed)
 
-- strict PartIntent schema and constrained parser
-- deterministic CadQuery/OpenCASCADE construction
-- BRepCheck + STEP/BREP export
-- exact HLR views and DrawingIR
-- three-view projection-ray 3D vertex candidates
-
-## v0.4 — visual-first architectural pivot (implemented)
-
-- retain v0.3 as `parametric` baseline
 - provider/service interfaces for T2I and image-to-3D
 - OpenAI-compatible T2I adapter
 - Hunyuan3D-2.1 official FastAPI adapter
 - Hunyuan3D-2mv 1-4 named-view adapter + optional sidecar
-- `text2image`, `image2mesh`, `text2mesh`, `views2mesh`, `mesh-info` CLI
-- reconstruction-friendly mechanical visual prompt
-- persistent stage manifest/intermediate outputs
-- trimesh hard gate: topology, watertightness, extents, area, volume
-- fake-provider regression tests; no GPU model required by CI
+- `text2image`, `image2mesh`, `text2mesh`, `views2mesh`, `mesh-info`
+- persistent stage manifests and intermediate artifacts
+- trimesh hard gate
+- DrawingIR/cross-view utilities retained for validation research
 
-## v0.5 — mechanical reconstruction benchmark
+## v0.5 — remove legacy text-to-JSON construction path (completed)
+
+- delete PartIntent schema
+- delete regex/LLM geometry parser
+- delete constraint resolver and domain checks
+- delete direct text-driven CadQuery builder
+- delete `parametric`, `build`, and `schema` CLI commands
+- remove legacy examples and tests
+- remove SciPy dependency that existed only for the old constraint resolver
+- make documentation and public API visual-only
+
+## v0.6 — mechanical reconstruction benchmark
 
 - 30-100 STEP reference parts rendered from controlled cameras
-- compare single-view Hunyuan3D-2.1 vs 1-4-view Hunyuan3D-2mv vs cloud model
+- compare single-view Hunyuan3D-2.1 vs multi-view Hunyuan3D-2mv vs remote baselines
 - Chamfer/Hausdorff/silhouette metrics
 - hole, thin-wall, sharp-edge and component-count preservation scores
-- deterministic camera/render manifest
-- establish a pass/fail threshold before investing in CADification
+- deterministic camera/render manifests
+- establish pass/fail thresholds before deep CADification work
 
-## v0.6 — CADification primitives
+## v0.7 — CADification primitives
 
 - mesh cleanup without destroying openings
 - face-normal + curvature region growing
 - robust plane/cylinder/cone/sphere/torus fitting
-- analytic-complexity prior (simple primitives before freeform)
+- analytic-complexity prior
 - adjacency graph and sharp-edge extraction
-- engineering symmetry / coaxial / coplanar regularization
+- symmetry / coaxial / coplanar regularization
 
-## v0.7 — raw B-Rep reconstruction
+## v0.8 — raw B-Rep reconstruction
 
 - primitive surface intersections
 - trim-curve and loop construction
@@ -48,9 +49,9 @@
 - BRepCheck hard gate
 - STEP export
 
-## v0.8 — verification + feature layer
+## v0.9 — verification + feature layer
 
 - HLR reprojection against source/multi-view masks
 - geometry residual optimization
-- canonical feature recognition/reconstruction as an optional final layer
-- SolidWorks/NX/Creo adapters only after analytic B-Rep quality is stable
+- optional canonical feature recognition after B-Rep quality is stable
+- SolidWorks/NX/Creo adapters only after analytic B-Rep reconstruction is reliable
