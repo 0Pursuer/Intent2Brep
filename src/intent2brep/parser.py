@@ -32,9 +32,9 @@ class RegexIntentParser(IntentParser):
         slots = self._parse_slots(normalized)
         unsupported = []
         if re.search(r"(?:圆角|fillet|R\s*\d+)", normalized, re.I):
-            unsupported.append("fillet requested but v0.1 leaves fillet recognition/building for the next milestone")
+            unsupported.append("fillet requested but fillet construction is not implemented in v0.3")
         if re.search(r"(?:倒角|chamfer)", normalized, re.I):
-            unsupported.append("chamfer requested but not implemented in v0.1")
+            unsupported.append("chamfer requested but not implemented in v0.3")
 
         assumptions: list[str] = []
         if web and web.centered_on_base:

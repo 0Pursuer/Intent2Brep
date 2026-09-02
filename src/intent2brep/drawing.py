@@ -5,6 +5,8 @@ import json
 
 import cadquery as cq
 
+from .drawing_ir import extract_drawing_view_ir
+
 
 # Camera-to-object directions for orthographic engineering views.
 VIEWS = {
@@ -34,6 +36,11 @@ def export_views(shape: cq.Shape, output_dir: Path, show_hidden: bool = True) ->
         p = output_dir / f"{name}.svg"
         p.write_text(svg, encoding="utf-8")
         out[name] = str(p)
+
+        ir = extract_drawing_view_ir(shape, name, direction, include_hidden=show_hidden)
+        ir_path = output_dir / f"{name}.json"
+        ir_path.write_text(ir.model_dump_json(indent=2), encoding="utf-8")
+        out[f"{name}_ir"] = str(ir_path)
     manifest = output_dir / "drawing_manifest.json"
     manifest.write_text(json.dumps({"views": VIEWS, "files": out}, indent=2), encoding="utf-8")
     out["manifest"] = str(manifest)

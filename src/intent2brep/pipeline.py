@@ -8,6 +8,8 @@ from .builder import build_brep, export_shape
 from .checks import validate_intent_domain
 from .errors import UnsupportedIntentError
 from .drawing import export_views
+from .drawing_ir import DrawingViewIR
+from .cross_view import reconstruct_vertex_candidates
 from .models import PartIntent
 from .parser import IntentParser, OpenAICompatibleIntentParser, RegexIntentParser
 from .resolver import ResolvedPart, resolve_constraints
@@ -59,7 +61,17 @@ def run_pipeline(
 
     shape = build_brep(resolved)
     outputs = export_shape(shape, out, "03_model")
-    outputs.update({f"view_{k}": v for k, v in export_views(shape, out / "views").items()})
+    view_outputs = export_views(shape, out / "views")
+    outputs.update({f"view_{k}": v for k, v in view_outputs.items()})
+
+    ortho_views = [
+        DrawingViewIR.model_validate_json((out / "views" / f"{name}.json").read_text(encoding="utf-8"))
+        for name in ("front", "top", "right")
+    ]
+    wireframe = reconstruct_vertex_candidates(ortho_views)
+    wireframe_path = out / "views" / "wireframe_vertices.json"
+    wireframe_path.write_text(wireframe.model_dump_json(indent=2), encoding="utf-8")
+    outputs["wireframe_vertices"] = str(wireframe_path)
 
     validation = validate_shape(shape)
     (out / "04_validation.json").write_text(json.dumps(validation, indent=2), encoding="utf-8")
