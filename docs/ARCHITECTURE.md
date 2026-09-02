@@ -1,52 +1,57 @@
 # Architecture
 
-## v0.4 architectural pivot
+## Visual-first architecture
 
-v0.3 made `Text -> Engineering JSON -> B-Rep` the mainline. v0.4 deliberately keeps that route as a **parametric baseline** and introduces an independent **visual mainline**.
+Intent2Brep has a single primary reconstruction path:
 
 ```text
-                              Natural Language
-                               /             \
-                              v               v
-                      Visual mainline   Parametric baseline
-                              |               |
-                         T2I provider      PartIntent
-                              |               |
-                       canonical image      resolver
-                              |               |
-                   optional view synthesis   CSG/OCC
-                              |               |
-                       1-4 named views       B-Rep
-                              |
-                    Image-to-3D provider
-                              |
-                           raw mesh
-                              |
-                    mesh quality hard gate
-                              |
-                      CADification layer
-             segmentation / normals / primitives
-                              |
-          plane/cylinder/cone/sphere/torus/NURBS
-                              |
-                  global regularization
-                              |
-                  surface intersections
-                              |
-                       analytic B-Rep
-                              |
-                    healing / validation
-                              |
-                            STEP
-                              |
-                  HLR reprojection feedback
+Natural Language
+      |
+      v
+Text-to-Image Provider
+      |
+      v
+Canonical Image
+      |
+      +---------------------------+
+      |                           |
+      v                           v
+single image              optional multi-view
+      |                           |
+      +-------------+-------------+
+                    |
+                    v
+            Image-to-3D Provider
+                    |
+                    v
+                Raw Mesh
+                    |
+                    v
+            Mesh Quality Gate
+                    |
+                    v
+              CADification
+       normal/curvature segmentation
+       primitive surface hypotheses
+       symmetry/coaxial/coplanar rules
+                    |
+                    v
+          Analytic Surface Patches
+                    |
+                    v
+       Intersections + Trim Loops
+                    |
+                    v
+              Analytic B-Rep
+                    |
+                    v
+         Healing / BRepCheck / STEP
+                    |
+                    v
+           HLR Reprojection Check
 ```
 
-The decisive rule is:
-
-> The visual route must not secretly become text -> complete geometry JSON.
-
-Text conditions image generation. 3D geometry is supplied by the 2D/multi-view reconstruction model. Deterministic geometry code begins after a coarse 3D prior exists.
+The architecture deliberately excludes a text-to-complete-geometry intermediate representation. Text conditions visual generation; the 3D body originates from image/multi-view reconstruction.
 
 ## Provider boundary
 
@@ -54,15 +59,15 @@ Core contracts live in `providers/base.py`:
 
 - `TextToImageProvider`
 - `ImageTo3DProvider`
-- `MultiViewProvider` (reserved for view-synthesis adapters)
+- `MultiViewProvider`
 
 Current adapters:
 
 - `OpenAICompatibleImageProvider`
-- `Hunyuan3D21HttpProvider` for Tencent's official single-image `/generate` API
-- `Hunyuan3D2MVHttpProvider` for the included 1-4-view sidecar
+- `Hunyuan3D21HttpProvider`
+- `Hunyuan3D2MVHttpProvider`
 
-PyTorch/diffusers/Hunyuan packages are intentionally not dependencies of the CadQuery core environment.
+GPU model packages are intentionally isolated from the core OpenCASCADE/CadQuery environment.
 
 ## Visual artifacts
 
@@ -79,22 +84,27 @@ visual_prompt.txt
 run_manifest.json
 ```
 
-This makes failures attributable: T2I generation, view consistency, I2-3D topology and later CADification errors remain separate.
+This makes failures attributable to image generation, multi-view consistency, image-to-3D topology, or later CADification.
 
-## What remains from v0.3
+## DrawingIR and cross-view utilities
 
-`drawing_ir.py`, `cross_view.py`, exact HLR, BRepCheck and STEP export stay. They become downstream validation/research tools rather than evidence that upstream geometry has already been solved.
+`drawing.py`, `drawing_ir.py`, and `cross_view.py` remain because they are useful downstream, not because the project reconstructs CAD from text parameters.
 
-## Next hard technical boundary
+They support:
 
-The next implementation milestone is not another language schema:
+- exact HLR projection from known B-Rep fixtures/reference parts;
+- benchmark generation;
+- vector-view reconstruction experiments;
+- future B-Rep reprojection validation.
+
+## Next hard boundary
 
 ```text
-Hunyuan mesh
+Hunyuan/raw mesh
   -> topology-preserving cleanup
   -> normal/curvature segmentation
   -> analytic primitive hypotheses
-  -> symmetry/coaxial/coplanar regularization
+  -> engineering regularization
   -> surface intersections
   -> trim loops
   -> face -> shell -> solid
