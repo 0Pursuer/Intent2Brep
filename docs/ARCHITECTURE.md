@@ -1,120 +1,103 @@
 # Architecture
 
-## Target architecture
+## v0.4 architectural pivot
+
+v0.3 made `Text -> Engineering JSON -> B-Rep` the mainline. v0.4 deliberately keeps that route as a **parametric baseline** and introduces an independent **visual mainline**.
 
 ```text
-Natural Language
-    -> Geometry Intent Model
-    -> Engineering Geometry IR (Pydantic / JSON Schema)
-    -> Semantic + domain validation
-    -> Constraint Solver
-    -> Structured Drawing IR
-    -> Cross-view matching
-    -> 3D wireframe + surface hypotheses
-    -> Analytic B-Rep construction (OpenCASCADE)
-    -> Healing / validation
-    -> STEP
-            ^
-            |
-      HLR re-projection
-      + discrepancy score
+                              Natural Language
+                               /             \
+                              v               v
+                      Visual mainline   Parametric baseline
+                              |               |
+                         T2I provider      PartIntent
+                              |               |
+                       canonical image      resolver
+                              |               |
+                   optional view synthesis   CSG/OCC
+                              |               |
+                       1-4 named views       B-Rep
+                              |
+                    Image-to-3D provider
+                              |
+                           raw mesh
+                              |
+                    mesh quality hard gate
+                              |
+                      CADification layer
+             segmentation / normals / primitives
+                              |
+          plane/cylinder/cone/sphere/torus/NURBS
+                              |
+                  global regularization
+                              |
+                  surface intersections
+                              |
+                       analytic B-Rep
+                              |
+                    healing / validation
+                              |
+                            STEP
+                              |
+                  HLR reprojection feedback
 ```
 
-## What v0.3 implements
+The decisive rule is:
+
+> The visual route must not secretly become text -> complete geometry JSON.
+
+Text conditions image generation. 3D geometry is supplied by the 2D/multi-view reconstruction model. Deterministic geometry code begins after a coarse 3D prior exists.
+
+## Provider boundary
+
+Core contracts live in `providers/base.py`:
+
+- `TextToImageProvider`
+- `ImageTo3DProvider`
+- `MultiViewProvider` (reserved for view-synthesis adapters)
+
+Current adapters:
+
+- `OpenAICompatibleImageProvider`
+- `Hunyuan3D21HttpProvider` for Tencent's official single-image `/generate` API
+- `Hunyuan3D2MVHttpProvider` for the included 1-4-view sidecar
+
+PyTorch/diffusers/Hunyuan packages are intentionally not dependencies of the CadQuery core environment.
+
+## Visual artifacts
+
+A visual run preserves stage evidence:
 
 ```text
-Text
-  -> constrained regex parser OR optional OpenAI-compatible LLM parser
-  -> strict PartIntent JSON
-  -> fail-closed semantic/domain checks
-  -> numeric constraint resolver
-  -> analytic box/cylinder/slot CSG
-  -> OpenCASCADE B-Rep
-  -> BRepCheck validation
-  -> STEP + native .brep
-  -> exact HLR Front/Top/Right/ISO projections
-  -> DrawingIR JSON
-       * projector world basis
-       * visible/hidden
-       * sharp/smooth/outline
-       * LINE/CIRCLE/BSPLINE/... geometry class
-       * endpoints, curve length, circle center/radius, sampled fallback
-  -> three-view projection-ray intersection
-  -> verified 3D vertex candidates
+source_prompt.txt
+visual_prompt.txt
+01_t2i/candidate_00.png
+02_preprocess/source.png
+03_multiview/*.png
+04_mesh/raw.glb
+04_mesh/mesh_report.json
+run_manifest.json
 ```
 
-The DrawingIR is currently generated *from* the resulting B-Rep. This gives a controlled round-trip benchmark and a dataset-generation path. It does **not** mean general engineering drawings can already be reconstructed into B-Rep.
+This makes failures attributable: T2I generation, view consistency, I2-3D topology and later CADification errors remain separate.
 
-## Safety boundary for geometry generation
+## What remains from v0.3
 
-The system separates three failure classes:
+`drawing_ir.py`, `cross_view.py`, exact HLR, BRepCheck and STEP export stay. They become downstream validation/research tools rather than evidence that upstream geometry has already been solved.
 
-1. **Underspecified intent** — e.g. a non-centered hole with no coordinates. Reject rather than assume center.
-2. **Unsupported intent** — e.g. fillet/chamfer in the current subset. Reject by default rather than omit silently.
-3. **Impossible domain geometry** — e.g. a hole larger than the plate. Reject before OpenCASCADE.
+## Next hard technical boundary
 
-This boundary becomes more important after an LLM is connected: syntactically valid JSON is not equivalent to engineering-valid geometry.
-
-## DrawingIR design
-
-The HLR projector defines an orthographic 2D coordinate frame. Every view stores:
-
-- `origin_world`
-- `projection_direction`
-- `x_axis_world`
-- `y_axis_world`
-
-A 2D point `(u, v)` therefore represents the world-space projection ray:
+The next implementation milestone is not another language schema:
 
 ```text
-P(t) = origin + u*x_axis + v*y_axis + t*projection_direction
+Hunyuan mesh
+  -> topology-preserving cleanup
+  -> normal/curvature segmentation
+  -> analytic primitive hypotheses
+  -> symmetry/coaxial/coplanar regularization
+  -> surface intersections
+  -> trim loops
+  -> face -> shell -> solid
+  -> BRepCheck
+  -> HLR reprojection residual
 ```
-
-This explicit frame avoids hard-coding assumptions such as "front means XZ". It also makes cross-view reconstruction generic for any orthographic view direction.
-
-HLR result categories are converted into structured entities. Exact coincident visible/hidden duplicates are de-duplicated with visible geometry taking precedence.
-
-## Cross-view vertex reconstruction in v0.3
-
-For each non-closed projected entity endpoint:
-
-1. form its world-space projection ray;
-2. intersect rays from two views;
-3. reject pairs whose closest-point distance exceeds tolerance;
-4. re-project the candidate into a third view;
-5. accept only candidates landing on a third-view endpoint;
-6. merge spatial duplicates.
-
-For a simple rectangular box, this recovers exactly the eight true 3D corners without reading original B-Rep vertex positions.
-
-This stage reconstructs **vertices only**. It does not yet determine which projected edges correspond to which 3D edges.
-
-## Why not PNG-first
-
-Raster views are useful for human/VLM inspection, but are not authoritative geometry. Exact engineering entities should live in vector/symbolic form because dimensions, tangency, concentricity and hidden-line semantics are not reliably preserved by pixels.
-
-## Next reconstruction architecture
-
-```text
-External Front/Top/Right DrawingIR
-        -> projected entity graph
-        -> cross-view vertex candidates        [v0.3 primitive exists]
-        -> projected-edge compatibility matrix [next]
-        -> ambiguity-aware edge graph search
-        -> 3D wireframe
-        -> loops
-        -> surface hypotheses
-             plane
-             cylinder
-             cone
-             sphere/torus
-             extrusion/revolution
-             NURBS fallback only
-        -> trim/intersection
-        -> wire -> face -> shell -> solid
-        -> sewing + same-domain unification
-        -> BRepCheck
-        -> HLR re-projection score
-```
-
-The key research question remains reliable `DrawingIR -> analytic B-Rep` under ambiguity.
