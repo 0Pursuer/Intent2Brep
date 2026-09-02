@@ -1,15 +1,27 @@
 import json
 
-from intent2brep.builder import build_brep
+import cadquery as cq
+
+from intent2brep.drawing import export_views
 from intent2brep.drawing_ir import extract_drawing_view_ir
-from intent2brep.parser import RegexIntentParser
-from intent2brep.resolver import resolve_constraints
 
 
 def _bracket_shape():
-    text = "100x60x10 mm 底板，中间竖一个宽60mm、厚10mm、高50mm的支撑板，支撑板中心有一个直径20mm通孔。"
-    intent = RegexIntentParser().parse(text)
-    return build_brep(resolve_constraints(intent))
+    base = cq.Workplane("XY").box(100, 60, 10, centered=(True, True, False)).val()
+    web = (
+        cq.Workplane("XY")
+        .box(60, 10, 50, centered=(True, True, False))
+        .translate((0, 0, 10))
+        .val()
+    )
+    shape = base.fuse(web)
+    cutter = cq.Solid.makeCylinder(
+        10,
+        14,
+        cq.Vector(0, -7, 35),
+        cq.Vector(0, 1, 0),
+    )
+    return shape.cut(cutter).clean()
 
 
 def test_front_view_preserves_exact_circle():
@@ -37,14 +49,12 @@ def test_visible_edges_win_over_exact_hidden_duplicates():
     assert len(keys) == len(set(keys))
 
 
-def test_pipeline_writes_drawing_ir(tmp_path):
-    from intent2brep.pipeline import run_pipeline
-
-    r = run_pipeline("底板 80x50x8 mm，中间直径12mm通孔。", tmp_path)
+def test_export_views_writes_drawing_ir(tmp_path):
+    outputs = export_views(_bracket_shape(), tmp_path / "views")
     front_json = tmp_path / "views" / "front.json"
     assert front_json.exists()
     data = json.loads(front_json.read_text(encoding="utf-8"))
     assert data["frame"]["name"] == "front"
     assert data["entities"]
-    assert r.outputs["view_front_ir"] == str(front_json)
-    assert (tmp_path / "views" / "wireframe_vertices.json").exists()
+    assert outputs["front_ir"] == str(front_json)
+    assert (tmp_path / "views" / "drawing_manifest.json").exists()

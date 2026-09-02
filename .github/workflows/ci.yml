@@ -21,13 +21,15 @@ jobs:
       - name: Run tests
         shell: bash -el {0}
         run: pytest -q
-      - name: Smoke-test parametric baseline
+      - name: Smoke-test visual CLI
         shell: bash -el {0}
         run: |
-          intent2brep schema > /tmp/schema.json
-          intent2brep parametric '底板 80x50x8 mm，中间直径12mm通孔。' -o /tmp/intent2brep-smoke
-          test -s /tmp/intent2brep-smoke/03_model.step
-          test -s /tmp/intent2brep-smoke/views/front.json
+          intent2brep --help > /tmp/help.txt
+          grep -q 'text2image' /tmp/help.txt
+          grep -q 'image2mesh' /tmp/help.txt
+          grep -q 'views2mesh' /tmp/help.txt
+          ! grep -q 'parametric' /tmp/help.txt
+          ! grep -q 'schema' /tmp/help.txt
       - name: Smoke-test mesh inspection
         shell: bash -el {0}
         run: |
