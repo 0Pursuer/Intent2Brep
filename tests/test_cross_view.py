@@ -1,13 +1,11 @@
-from intent2brep.builder import build_brep
+import cadquery as cq
+
 from intent2brep.cross_view import reconstruct_vertex_candidates
 from intent2brep.drawing_ir import extract_drawing_view_ir
-from intent2brep.models import BasePlate, PartIntent
-from intent2brep.resolver import resolve_constraints
 
 
 def _box_views():
-    intent = PartIntent(base=BasePlate(length=80, width=50, thickness=8))
-    shape = build_brep(resolve_constraints(intent))
+    shape = cq.Workplane("XY").box(80, 50, 8, centered=(True, True, False)).val()
     return [
         extract_drawing_view_ir(shape, "front", (0, -1, 0), include_hidden=False),
         extract_drawing_view_ir(shape, "top", (0, 0, 1), include_hidden=False),
