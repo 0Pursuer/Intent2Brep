@@ -2,57 +2,76 @@
 
 **Intent2Brep** is a visual-first Text/Image-to-3D research pipeline toward analytic CAD B-Rep.
 
-v0.4 keeps two hypotheses side by side:
-
-1. **Visual mainline** — natural language -> text-to-image -> image/multi-view-to-3D -> measured mesh -> CADification -> B-Rep.
-2. **Parametric baseline** — natural language -> strict engineering JSON -> CadQuery/OpenCASCADE B-Rep (the original v0.3 path).
-
-The main research question is no longer only "can an LLM emit the whole feature history?". It is:
-
-> Can a modern image-to-3D foundation model provide a useful geometric prior, then can engineering regularization project that noisy result back into analytic CAD space?
-
-## v0.4 architecture
+The project has one primary path:
 
 ```text
-                         Natural language
-                         /              \
-                        v                v
-               Visual mainline    Parametric baseline
-                        |                |
-                  T2I provider       PartIntent JSON
-                        |                |
-                 canonical image     resolver / CSG
-                        |                |
-               optional multi-view     B-Rep / STEP
-                        |
-              Hunyuan3D provider
-                        |
-                    raw mesh
-                        |
-                 mesh hard gate
-                        |
-             CADification (next)
-                        |
-                 analytic B-Rep
-                        |
-                      STEP
+Natural language
+      |
+      v
+Text-to-Image provider
+      |
+      v
+canonical mechanical image
+      |
+      +------ optional view synthesis / known multi-view inputs
+      |
+      v
+Image-to-3D foundation model
+      |
+      v
+raw 3D geometry (mesh today)
+      |
+      v
+mesh quality hard gate
+      |
+      v
+CADification
+  - topology-preserving cleanup
+  - plane/cylinder/cone/sphere/torus recovery
+  - symmetry/coaxial/coplanar regularization
+  - surface intersections and trim loops
+      |
+      v
+analytic B-Rep
+      |
+      v
+STEP
 ```
 
-**Important:** v0.4 does not pretend that a Hunyuan mesh is already CAD. The visual path deliberately stops at a measured mesh boundary. Surface segmentation, analytic primitive fitting, global regularization and B-Rep assembly are the next milestones.
+The removed legacy path `Text -> PartIntent JSON -> resolver -> CadQuery construction` is no longer part of the package, CLI, tests, or documentation architecture. Text is used to condition visual generation; the geometric body must come from 2D/multi-view-to-3D reconstruction.
 
-## Why provider/services
+## Current status
 
-CadQuery/OpenCASCADE and GPU foundation models have different Python/CUDA stacks. The core package stays lightweight and calls model services over HTTP.
+Implemented:
+
+- model-agnostic text-to-image provider
+- Hunyuan3D-2.1 single-image HTTP provider
+- Hunyuan3D-2mv 1-4 named-view HTTP provider and optional sidecar
+- `text2image`, `image2mesh`, `text2mesh`, `views2mesh`
+- deterministic `mesh-info` quality report
+- retained OpenCASCADE HLR / DrawingIR / cross-view utilities for downstream validation and benchmark generation
+
+Not implemented yet:
+
+- robust mechanical mesh cleanup
+- analytic primitive segmentation/fitting
+- global engineering regularization
+- raw B-Rep reconstruction from recovered surfaces
+- STEP export from the visual reconstruction path
+
+## Why model services are isolated
+
+The CadQuery/OpenCASCADE utilities and GPU foundation models have different Python/CUDA dependency stacks. Intent2Brep keeps GPU models behind provider/service interfaces:
 
 ```text
-Intent2Brep core (Python 3.11 + OCC)
-          |
-          +---- HTTP ----> Text-to-image service
-          |
-          +---- HTTP ----> Hunyuan3D service
+Intent2Brep core
+   |
+   +---- HTTP ----> Text-to-image service
+   |
+   +---- HTTP ----> Hunyuan3D service
 ```
 
-This also makes models replaceable: HunyuanImage/FLUX/remote T2I APIs can implement the T2I provider; Hunyuan3D-2.1, Hunyuan3D-2mv, cloud HY-3D or future models can implement image-to-3D.
+This keeps the visual pipeline replaceable and avoids coupling the repository to a specific torch/CUDA environment.
 
 ## Install core
 
@@ -63,22 +82,14 @@ python -m pip install -e . --no-deps --no-build-isolation
 pytest -q
 ```
 
-## Parametric baseline
-
-```bash
-intent2brep parametric \
-  '100x60x10 mm 底板，中间竖一个宽60mm、厚10mm、高50mm的支撑板，支撑板中心有一个直径20mm通孔。' \
-  -o out_parametric
-```
-
-`intent2brep build ...` remains a backward-compatible alias.
-
 ## Image -> Hunyuan3D-2.1 -> mesh
 
-Run Tencent's Hunyuan3D-2.1 FastAPI server in its own environment (normally port 8081), then:
+Run Tencent's Hunyuan3D-2.1 FastAPI service separately, then:
 
 ```bash
-intent2brep image2mesh part.png --hunyuan-url http://127.0.0.1:8081 -o out_visual
+intent2brep image2mesh part.png \
+  --hunyuan-url http://127.0.0.1:8081 \
+  -o out_visual
 ```
 
 Outputs include:
@@ -91,77 +102,38 @@ out_visual/
   run_manifest.json
 ```
 
-## Text -> image with a custom OpenAI-compatible API
+## Text -> image
 
-The T2I provider accepts the common OpenAI-compatible `POST /images/generations` contract.
-
-Project-specific variables are preferred:
+Configure an OpenAI-compatible image-generation endpoint:
 
 ```bash
 export T2I_BASE_URL=https://provider.example/v1
-export T2I_API_KEY=your-secret
-export T2I_MODEL=your-image-model
-```
-
-Standard OpenAI-style variables also work:
-
-```bash
-export OPENAI_BASE_URL=https://provider.example/v1
-export OPENAI_API_KEY=your-secret
-export OPENAI_IMAGE_MODEL=your-image-model
-```
-
-Do not commit API keys. Prefer environment variables rather than passing a secret as a command-line argument.
-
-If the gateway uses a custom secret variable, keep the value in that variable and tell the CLI which variable to read:
-
-```bash
-export MY_IMAGE_GATEWAY_KEY=your-secret
-
-intent2brep text2image '一个机械双耳支架...' \
-  --t2i-base-url https://provider.example/v1 \
-  --t2i-model your-image-model \
-  --t2i-api-key-env MY_IMAGE_GATEWAY_KEY \
-  -o out_t2i
-```
-
-Some OpenAI-compatible gateways reject `response_format`. Use `auto` to omit it while still accepting either `url` or `b64_json` responses:
-
-```bash
-intent2brep text2image '一个机械双耳支架...' \
-  --t2i-base-url https://provider.example/v1 \
-  --t2i-model your-image-model \
-  --t2i-response-format auto \
-  -o out_t2i
-```
-
-A non-standard endpoint path can also be configured:
-
-```bash
-intent2brep text2image '一个机械双耳支架...' \
-  --t2i-base-url https://provider.example \
-  --t2i-endpoint-path /openai/v1/images/generations \
-  --t2i-model your-image-model \
-  -o out_t2i
-```
-
-Equivalent environment switches are:
-
-```text
-T2I_SIZE
-T2I_TIMEOUT
-T2I_SEND_SEED
-T2I_RESPONSE_FORMAT   # b64_json | url | auto
-T2I_ENDPOINT_PATH
-T2I_AUTH_HEADER       # default: Authorization
-T2I_AUTH_SCHEME       # default: Bearer
+export T2I_API_KEY=...
+export T2I_MODEL=...
 ```
 
 Then:
 
 ```bash
 intent2brep text2image '一个机械双耳支架...' -o out_t2i
+```
 
+CLI overrides are also supported:
+
+```bash
+intent2brep text2image '一个机械双耳支架...' \
+  --t2i-base-url https://provider.example/v1 \
+  --t2i-model your-image-model \
+  --t2i-api-key-env MY_IMAGE_GATEWAY_KEY \
+  --t2i-response-format auto \
+  -o out_t2i
+```
+
+The prompt adapter adds rendering constraints only: isolated mechanical part, neutral material, clean background, visible holes/openings and reconstruction-friendly viewing. It does **not** emit CAD feature commands or a complete geometry JSON.
+
+## Text -> image -> Hunyuan3D -> mesh
+
+```bash
 intent2brep text2mesh '一个机械双耳支架...' \
   --t2i-base-url https://provider.example/v1 \
   --t2i-model your-image-model \
@@ -170,17 +142,16 @@ intent2brep text2mesh '一个机械双耳支架...' \
   -o out_visual
 ```
 
-The prompt adapter adds only rendering constraints (isolated matte CAD part, white background, visible openings, weak perspective). It does **not** emit hidden geometry JSON or CAD feature commands.
-
 ## Multi-view -> Hunyuan3D-2mv -> mesh
 
-The public Hunyuan3D-2mv path accepts up to four named views: `front/back/left/right`. The repository includes an optional sidecar under `services/hunyuan3d_2mv/` so its PyTorch environment stays isolated.
+The included sidecar accepts up to four named views: `front/back/left/right`.
 
 ```bash
 intent2brep views2mesh \
   --front front.png \
   --left left.png \
   --back back.png \
+  --right right.png \
   --hunyuan-url http://127.0.0.1:8082 \
   -o out_mv
 ```
@@ -191,15 +162,14 @@ intent2brep views2mesh \
 intent2brep mesh-info model.glb
 ```
 
-The report records vertex/face counts, connected components, watertightness, winding consistency, Euler number, area, volume (when valid), bounds and extents. These are the first deterministic checks before CADification.
+The report records vertex/face counts, connected components, watertightness, winding consistency, Euler number, area, volume when valid, bounds and extents.
 
 ## Repository layout
 
 ```text
 src/intent2brep/
   pipelines/
-    parametric.py       # deterministic v0.3 baseline
-    visual.py           # visual-first mainline
+    visual.py
   providers/
     t2i/
     i23d/
@@ -207,11 +177,13 @@ src/intent2brep/
     prompting.py
   mesh/
     metrics.py
-  drawing_ir.py         # retained for HLR/reprojection validation
-  cross_view.py         # retained vector reconstruction research
+  drawing.py
+  drawing_ir.py
+  cross_view.py
+  validation.py
 
 services/
-  hunyuan3d_2mv/        # optional GPU sidecar
+  hunyuan3d_2mv/
 ```
 
-See `docs/ARCHITECTURE.md`, `docs/HUNYUAN_INTEGRATION.md`, and `docs/ROADMAP.md`.
+See `docs/ARCHITECTURE.md`, `docs/HUNYUAN_INTEGRATION.md`, `docs/REMOTE_3D_APIS.md`, and `docs/ROADMAP.md`.
