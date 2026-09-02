@@ -12,3 +12,15 @@ class UnsupportedIntentError(Intent2BRepError):
 
 class GeometryDomainError(Intent2BRepError):
     """Raised when resolved dimensions cannot form the requested part."""
+
+
+class ProviderConfigurationError(Intent2BRepError):
+    """Raised when an external model provider is not configured."""
+
+
+class ProviderExecutionError(Intent2BRepError):
+    """Raised when an external model provider fails or returns invalid data."""
+
+
+class MeshValidationError(Intent2BRepError):
+    """Raised when a generated mesh cannot be loaded or inspected."""
