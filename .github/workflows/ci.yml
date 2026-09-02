@@ -21,12 +21,19 @@ jobs:
       - name: Run tests
         shell: bash -el {0}
         run: pytest -q
-      - name: Smoke-test CLI
+      - name: Smoke-test parametric baseline
         shell: bash -el {0}
         run: |
           intent2brep schema > /tmp/schema.json
-          intent2brep build '底板 80x50x8 mm，中间直径12mm通孔。' -o /tmp/intent2brep-smoke
+          intent2brep parametric '底板 80x50x8 mm，中间直径12mm通孔。' -o /tmp/intent2brep-smoke
           test -s /tmp/intent2brep-smoke/03_model.step
-          test -s /tmp/intent2brep-smoke/views/front.svg
           test -s /tmp/intent2brep-smoke/views/front.json
-          test -s /tmp/intent2brep-smoke/views/wireframe_vertices.json
+      - name: Smoke-test mesh inspection
+        shell: bash -el {0}
+        run: |
+          python - <<'PY'
+          import trimesh
+          trimesh.creation.box().export('/tmp/box.glb')
+          PY
+          intent2brep mesh-info /tmp/box.glb > /tmp/mesh-info.json
+          grep -q 'vertex_count' /tmp/mesh-info.json
