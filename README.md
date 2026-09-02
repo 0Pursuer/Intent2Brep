@@ -91,21 +91,83 @@ out_visual/
   run_manifest.json
 ```
 
-## Text -> image -> Hunyuan3D-2.1 -> mesh
+## Text -> image with a custom OpenAI-compatible API
 
-Configure an OpenAI-compatible image-generation endpoint:
+The T2I provider accepts the common OpenAI-compatible `POST /images/generations` contract.
+
+Project-specific variables are preferred:
 
 ```bash
 export T2I_BASE_URL=https://provider.example/v1
-export T2I_API_KEY=...
-export T2I_MODEL=...
+export T2I_API_KEY=your-secret
+export T2I_MODEL=your-image-model
+```
+
+Standard OpenAI-style variables also work:
+
+```bash
+export OPENAI_BASE_URL=https://provider.example/v1
+export OPENAI_API_KEY=your-secret
+export OPENAI_IMAGE_MODEL=your-image-model
+```
+
+Do not commit API keys. Prefer environment variables rather than passing a secret as a command-line argument.
+
+If the gateway uses a custom secret variable, keep the value in that variable and tell the CLI which variable to read:
+
+```bash
+export MY_IMAGE_GATEWAY_KEY=your-secret
+
+intent2brep text2image '一个机械双耳支架...' \
+  --t2i-base-url https://provider.example/v1 \
+  --t2i-model your-image-model \
+  --t2i-api-key-env MY_IMAGE_GATEWAY_KEY \
+  -o out_t2i
+```
+
+Some OpenAI-compatible gateways reject `response_format`. Use `auto` to omit it while still accepting either `url` or `b64_json` responses:
+
+```bash
+intent2brep text2image '一个机械双耳支架...' \
+  --t2i-base-url https://provider.example/v1 \
+  --t2i-model your-image-model \
+  --t2i-response-format auto \
+  -o out_t2i
+```
+
+A non-standard endpoint path can also be configured:
+
+```bash
+intent2brep text2image '一个机械双耳支架...' \
+  --t2i-base-url https://provider.example \
+  --t2i-endpoint-path /openai/v1/images/generations \
+  --t2i-model your-image-model \
+  -o out_t2i
+```
+
+Equivalent environment switches are:
+
+```text
+T2I_SIZE
+T2I_TIMEOUT
+T2I_SEND_SEED
+T2I_RESPONSE_FORMAT   # b64_json | url | auto
+T2I_ENDPOINT_PATH
+T2I_AUTH_HEADER       # default: Authorization
+T2I_AUTH_SCHEME       # default: Bearer
 ```
 
 Then:
 
 ```bash
 intent2brep text2image '一个机械双耳支架...' -o out_t2i
-intent2brep text2mesh  '一个机械双耳支架...' -o out_visual
+
+intent2brep text2mesh '一个机械双耳支架...' \
+  --t2i-base-url https://provider.example/v1 \
+  --t2i-model your-image-model \
+  --t2i-api-key-env MY_IMAGE_GATEWAY_KEY \
+  --hunyuan-url http://127.0.0.1:8081 \
+  -o out_visual
 ```
 
 The prompt adapter adds only rendering constraints (isolated matte CAD part, white background, visible openings, weak perspective). It does **not** emit hidden geometry JSON or CAD feature commands.
