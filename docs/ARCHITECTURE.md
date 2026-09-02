@@ -20,9 +20,7 @@ Natural Language
       + discrepancy score
 ```
 
-## What v0.2 implements
-
-v0.2 proves the deterministic half first:
+## What v0.3 implements
 
 ```text
 Text
@@ -34,10 +32,18 @@ Text
   -> OpenCASCADE B-Rep
   -> BRepCheck validation
   -> STEP + native .brep
-  -> exact HLR Front/Top/Right/ISO SVG views
+  -> exact HLR Front/Top/Right/ISO projections
+  -> DrawingIR JSON
+       * projector world basis
+       * visible/hidden
+       * sharp/smooth/outline
+       * LINE/CIRCLE/BSPLINE/... geometry class
+       * endpoints, curve length, circle center/radius, sampled fallback
+  -> three-view projection-ray intersection
+  -> verified 3D vertex candidates
 ```
 
-The orthographic views are generated *from* the resulting B-Rep. They are a validation/inspection interface and a future dataset source, not yet the authoritative input used to reconstruct the B-Rep.
+The DrawingIR is currently generated *from* the resulting B-Rep. This gives a controlled round-trip benchmark and a dataset-generation path. It does **not** mean general engineering drawings can already be reconstructed into B-Rep.
 
 ## Safety boundary for geometry generation
 
@@ -49,18 +55,53 @@ The system separates three failure classes:
 
 This boundary becomes more important after an LLM is connected: syntactically valid JSON is not equivalent to engineering-valid geometry.
 
+## DrawingIR design
+
+The HLR projector defines an orthographic 2D coordinate frame. Every view stores:
+
+- `origin_world`
+- `projection_direction`
+- `x_axis_world`
+- `y_axis_world`
+
+A 2D point `(u, v)` therefore represents the world-space projection ray:
+
+```text
+P(t) = origin + u*x_axis + v*y_axis + t*projection_direction
+```
+
+This explicit frame avoids hard-coding assumptions such as "front means XZ". It also makes cross-view reconstruction generic for any orthographic view direction.
+
+HLR result categories are converted into structured entities. Exact coincident visible/hidden duplicates are de-duplicated with visible geometry taking precedence.
+
+## Cross-view vertex reconstruction in v0.3
+
+For each non-closed projected entity endpoint:
+
+1. form its world-space projection ray;
+2. intersect rays from two views;
+3. reject pairs whose closest-point distance exceeds tolerance;
+4. re-project the candidate into a third view;
+5. accept only candidates landing on a third-view endpoint;
+6. merge spatial duplicates.
+
+For a simple rectangular box, this recovers exactly the eight true 3D corners without reading original B-Rep vertex positions.
+
+This stage reconstructs **vertices only**. It does not yet determine which projected edges correspond to which 3D edges.
+
 ## Why not PNG-first
 
 Raster views are useful for human/VLM inspection, but are not authoritative geometry. Exact engineering entities should live in vector/symbolic form because dimensions, tangency, concentricity and hidden-line semantics are not reliably preserved by pixels.
 
-## Planned reconstruction architecture
+## Next reconstruction architecture
 
 ```text
-Front/Top/Right DrawingIR
+External Front/Top/Right DrawingIR
         -> projected entity graph
-        -> cross-view correspondence candidates
-        -> 3D vertex/edge hypotheses
-        -> ambiguity-aware graph search
+        -> cross-view vertex candidates        [v0.3 primitive exists]
+        -> projected-edge compatibility matrix [next]
+        -> ambiguity-aware edge graph search
+        -> 3D wireframe
         -> loops
         -> surface hypotheses
              plane
@@ -76,4 +117,4 @@ Front/Top/Right DrawingIR
         -> HLR re-projection score
 ```
 
-The key research question is not STEP serialization; it is reliable `DrawingIR -> analytic B-Rep` under ambiguity.
+The key research question remains reliable `DrawingIR -> analytic B-Rep` under ambiguity.

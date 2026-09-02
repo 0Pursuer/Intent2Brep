@@ -6,7 +6,7 @@ The hypothesis is simple:
 
 > let the model describe **geometry, dimensions and constraints**; let deterministic CAD algorithms own exact geometry.
 
-## Current pipeline (v0.2)
+## Current pipeline (v0.3)
 
 ```text
 Natural language
@@ -18,9 +18,11 @@ Natural language
    -> BRepCheck validation
    -> STEP + native BREP
    -> exact HLR front/top/right/isometric SVGs
+   -> Structured DrawingIR (visible/hidden analytic projected entities)
+   -> cross-view 3D vertex candidates
 ```
 
-The orthographic views are currently generated **from** the B-Rep. A true `Structured DrawingIR -> 3D wireframe -> analytic surfaces -> B-Rep` reconstruction stage is the next major research module.
+The orthographic views and DrawingIR are currently generated **from** the B-Rep. The new cross-view module deliberately reconstructs candidate 3D vertices from the projected views rather than reading original B-Rep vertex coordinates. This is a round-trip validation/dataset-generation step; a true external `DrawingIR -> 3D wireframe -> analytic surfaces -> B-Rep` path remains the next major research module.
 
 ## Supported subset
 
@@ -34,6 +36,9 @@ The orthographic views are currently generated **from** the B-Rep. A true `Struc
 - optional OpenAI-compatible LLM parser
 - exact STEP/BREP export via CadQuery/OCP/OpenCASCADE
 - exact hidden-line-removal orthographic SVG generation
+- per-view DrawingIR JSON with projector frame, visibility, edge class and curve type
+- exact circle center/radius preservation where OCCT returns a circular projected edge
+- three-view ray-intersection + reprojection filtering for 3D vertex candidates
 - OpenCASCADE `BRepCheck_Analyzer` validation
 
 ### Fail-closed behavior
@@ -45,7 +50,7 @@ The pipeline deliberately refuses to silently invent missing engineering informa
 - unsupported requests such as fillet/chamfer fail by default instead of producing a STEP that quietly omits them;
 - `--allow-unsupported` must be explicitly supplied to override that behavior during experiments.
 
-Blind-hole data exists in the schema, but v0.2 rejects it until face/direction semantics are explicit enough to avoid guessing the drilling side.
+Blind-hole data exists in the schema, but v0.3 rejects it until face/direction semantics are explicit enough to avoid guessing the drilling side.
 
 ## Installation
 
@@ -90,6 +95,11 @@ out/
     top.svg
     right.svg
     iso.svg
+    front.json
+    top.json
+    right.json
+    iso.json
+    wireframe_vertices.json
     drawing_manifest.json
 ```
 
@@ -123,7 +133,7 @@ The geometry backend does not depend on the provider. The model is only an **int
 pytest -q
 ```
 
-The test suite covers end-to-end B-Rep generation, explicit placement, schema CLI output, geometry-domain rejection and fail-closed unsupported-feature behavior.
+The test suite covers end-to-end B-Rep generation, explicit placement, schema CLI output, geometry-domain rejection, fail-closed unsupported-feature behavior, exact HLR DrawingIR extraction, and three-view reconstruction of box vertices.
 
 ## Design principles
 
@@ -139,7 +149,7 @@ See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md), [`docs/TECH_SURVEY.md`](docs
 
 ## Status
 
-This is intentionally a narrow MVP, not a general Text-to-CAD system. The next meaningful milestone is **Structured DrawingIR + cross-view reconstruction**, not more regex patterns.
+This is intentionally a narrow MVP, not a general Text-to-CAD system. v0.3 establishes a structured HLR DrawingIR and the first cross-view reconstruction primitive. The next meaningful milestone is **projected-edge correspondence + 3D wireframe reconstruction**, not more regex patterns.
 
 ## License
 

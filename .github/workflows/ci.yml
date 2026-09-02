@@ -28,3 +28,5 @@ jobs:
           intent2brep build '底板 80x50x8 mm，中间直径12mm通孔。' -o /tmp/intent2brep-smoke
           test -s /tmp/intent2brep-smoke/03_model.step
           test -s /tmp/intent2brep-smoke/views/front.svg
+          test -s /tmp/intent2brep-smoke/views/front.json
+          test -s /tmp/intent2brep-smoke/views/wireframe_vertices.json

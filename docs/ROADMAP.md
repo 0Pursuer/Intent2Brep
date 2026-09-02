@@ -10,7 +10,7 @@
 - STEP/BREP export
 - exact HLR SVG output
 
-## v0.2 — reliability boundary (implemented)
+## v0.2 — reliability boundary
 - fail closed on unsupported requests
 - no silent centering of underspecified holes
 - explicit `x/y/z` placement in constrained grammar
@@ -18,27 +18,35 @@
 - explicit centered/perpendicular constraints in the IR
 - schema CLI
 - end-to-end CLI smoke test
-- 8-test regression suite
+- regression suite
 - conda environment + GitHub Actions CI
 
-## v0.3 — Structured DrawingIR
-- exact projected entity representation, not just raw SVG paths
-- line/arc/circle/ellipse/spline entity types
+## v0.3 — Structured DrawingIR + first cross-view primitive (implemented)
+- exact OCCT HLR projected edges exposed as JSON entities
+- projector world frame persisted per view
 - visible/hidden semantics
-- dimension entities + value binding
-- view coordinate frames
-- cross-view correspondence IDs where known
-- import adapter for vectorized SVG engineering drawings
+- sharp/smooth/outline categories
+- analytic curve type preservation (`LINE`, `CIRCLE`, `BSPLINE`, ...)
+- exact circle center/radius when available
+- sampled fallback for generic curves
+- exact visible/hidden overlap de-duplication
+- three-view projection-ray intersection
+- third-view reprojection verification
+- 3D vertex candidate JSON output
+- 13-test regression suite
+
+## v0.4 — projected-edge correspondence -> 3D wireframe
+- candidate 3D edge generation from reconstructed vertices
+- compatibility scoring against all projected entities
+- line/arc/circle correspondence rules
+- hidden-line-aware matching
+- branch-and-bound / graph search for globally consistent edge sets
+- ambiguity score instead of forced single answers
+- external DrawingIR loader independent of generated B-Rep
 - benchmark adapter for the Zhang et al. 2023 SVG/STEP dataset
 
-## v0.4 — DrawingIR -> 3D wireframe
-- candidate 3D vertices from coordinate consistency
-- projected-edge compatibility matrix
-- graph/branch-and-bound matching
-- ambiguity score instead of forced single answers
-- human correction hooks
-
 ## v0.5 — surface hypothesis engine
+- loop detection
 - plane first
 - cylinder/cone/sphere/torus
 - extrusion/revolution surfaces
